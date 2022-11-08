@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:9
+# Multiarch image
+# Uploaded: Jun 6, 2022, 7:19:10 PM
+FROM gcr.io/distroless/static-debian11@sha256:d6fa9db9548b5772860fecddb11d84f9ebd7e0321c0cb3c02870402680cc315f
 
 ADD bin/ARG_ARCH/ARG_BIN /ARG_BIN
 
