@@ -723,10 +723,10 @@ func TranslateAffinityType(affinityType string) string {
 	case string(api_v1.ServiceAffinityClientIP):
 		return gceAffinityTypeClientIP
 	case string(api_v1.ServiceAffinityNone):
-		return gceAffinityTypeNone
+		return gceAffinityTypeClientIP
 	default:
 		klog.Errorf("Unexpected affinity type: %v", affinityType)
-		return gceAffinityTypeNone
+		return gceAffinityTypeClientIP
 	}
 }
 

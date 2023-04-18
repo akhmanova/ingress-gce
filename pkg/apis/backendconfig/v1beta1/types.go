@@ -41,6 +41,7 @@ type BackendConfigSpec struct {
 	SecurityPolicy       *SecurityPolicyConfig       `json:"securityPolicy,omitempty"`
 	TimeoutSec           *int64                      `json:"timeoutSec,omitempty"`
 	ConnectionDraining   *ConnectionDrainingConfig   `json:"connectionDraining,omitempty"`
+	ConnectionTracking   *ConnectionTrackingConfig   `json:"connectionTrackingPolicy,omitempty"`
 	SessionAffinity      *SessionAffinityConfig      `json:"sessionAffinity,omitempty"`
 	CustomRequestHeaders *CustomRequestHeadersConfig `json:"customRequestHeaders,omitempty"`
 	HealthCheck          *HealthCheckConfig          `json:"healthCheck,omitempty"`
@@ -124,6 +125,13 @@ type SecurityPolicyConfig struct {
 type ConnectionDrainingConfig struct {
 	// Draining timeout in seconds.
 	DrainingTimeoutSec int64 `json:"drainingTimeoutSec,omitempty"`
+}
+
+type ConnectionTrackingConfig struct {
+	TrackingMode                             string `json:"trackingMode,omitempty"`
+	ConnectionPersistenceOnUnhealthyBackends string `json:"connectionPersistenceOnUnhealthyBackends,omitempty"`
+	EnableStrongAffinity                     bool   `json:"enableStrongAffinity,omitempty"`
+	IdleTimeoutSec                           int64  `json:"idleTimeoutSec,omitempty"`
 }
 
 // SessionAffinityConfig contains configuration for stickiness parameters.

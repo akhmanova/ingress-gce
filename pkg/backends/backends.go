@@ -312,6 +312,10 @@ func (b *Backends) EnsureL4BackendService(name, hcLink, protocol, sessionAffinit
 		HealthChecks:        []string{hcLink},
 		SessionAffinity:     utils.TranslateAffinityType(sessionAffinity),
 		LoadBalancingScheme: scheme,
+		ConnectionTrackingPolicy: &composite.BackendServiceConnectionTrackingPolicy{
+			EnableStrongAffinity: true,
+			IdleTimeoutSec:       60 * 60 * 10, // 10 hours, where max is 18 hours
+		},
 	}
 	if protocol == string(api_v1.ProtocolTCP) {
 		expectedBS.ConnectionDraining = &composite.ConnectionDraining{DrainingTimeoutSec: DefaultConnectionDrainingTimeoutSeconds}
