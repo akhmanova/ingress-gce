@@ -246,12 +246,13 @@ func (l4c *L4Controller) processServiceCreateOrUpdate(service *v1.Service) *load
 	// Use the same function for both create and updates. If controller crashes and restarts,
 	// all existing services will show up as Service Adds.
 	l4ilbParams := &loadbalancers.L4ILBParams{
-		Service:          service,
-		Cloud:            l4c.ctx.Cloud,
-		Namer:            l4c.namer,
-		Recorder:         l4c.ctx.Recorder(service.Namespace),
-		DualStackEnabled: l4c.enableDualStack,
-		NetworkResolver:  l4c.networkResolver,
+		Service:                      service,
+		Cloud:                        l4c.ctx.Cloud,
+		Namer:                        l4c.namer,
+		Recorder:                     l4c.ctx.Recorder(service.Namespace),
+		DualStackEnabled:             l4c.enableDualStack,
+		StrongSessionAffinityEnabled: l4c.ctx.EnableL4StrongSessionAffinity,
+		NetworkResolver:              l4c.networkResolver,
 	}
 	l4 := loadbalancers.NewL4Handler(l4ilbParams)
 	syncResult := l4.EnsureInternalLoadBalancer(nodeNames, service)
@@ -325,12 +326,13 @@ func (l4c *L4Controller) processServiceDeletion(key string, svc *v1.Service) *lo
 	}()
 
 	l4ilbParams := &loadbalancers.L4ILBParams{
-		Service:          svc,
-		Cloud:            l4c.ctx.Cloud,
-		Namer:            l4c.namer,
-		Recorder:         l4c.ctx.Recorder(svc.Namespace),
-		DualStackEnabled: l4c.enableDualStack,
-		NetworkResolver:  l4c.networkResolver,
+		Service:                      svc,
+		Cloud:                        l4c.ctx.Cloud,
+		Namer:                        l4c.namer,
+		Recorder:                     l4c.ctx.Recorder(svc.Namespace),
+		DualStackEnabled:             l4c.enableDualStack,
+		StrongSessionAffinityEnabled: l4c.ctx.EnableL4StrongSessionAffinity,
+		NetworkResolver:              l4c.networkResolver,
 	}
 	l4 := loadbalancers.NewL4Handler(l4ilbParams)
 	l4c.ctx.Recorder(svc.Namespace).Eventf(svc, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer for %s", key)

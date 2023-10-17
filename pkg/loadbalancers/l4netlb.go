@@ -185,7 +185,7 @@ func (l4netlb *L4NetLB) checkStrongSessionAffinityRequirements() *utils.UserErro
 // This function does not link instances to Backend Service.
 func (l4netlb *L4NetLB) EnsureFrontend(nodeNames []string, svc *corev1.Service) *L4NetLBSyncResult {
 	isMultinetService := l4netlb.networkResolver.IsMultinetService(svc)
-	enabledStrongSessionAffinity := annotations.HasStrongSessionAffinityAnnotation(l4netlb.Service)
+	enabledStrongSessionAffinity := l4netlb.enableStrongSessionAffinity && annotations.HasStrongSessionAffinityAnnotation(l4netlb.Service)
 	result := NewL4SyncResult(SyncTypeCreate, svc, isMultinetService, enabledStrongSessionAffinity)
 	// If service already has an IP assigned, treat it as an update instead of a new Loadbalancer.
 	if len(svc.Status.LoadBalancer.Ingress) > 0 {
@@ -207,15 +207,17 @@ func (l4netlb *L4NetLB) EnsureFrontend(nodeNames []string, svc *corev1.Service) 
 		return result
 	}
 	l4netlb.networkInfo = *networkInfo
-	// if service requires strong session affinity, check requirements
-	if err := l4netlb.checkStrongSessionAffinityRequirements(); err != nil {
-		result.Error = err
-		result.MetricsState.Status = metrics.StatusError
-		if utils.IsUserError(err) {
-			result.MetricsLegacyState.IsUserError = true
-			result.MetricsState.Status = metrics.StatusUserError
+	if l4netlb.enableStrongSessionAffinity {
+		// if service requires strong session affinity, check requirements
+		if err := l4netlb.checkStrongSessionAffinityRequirements(); err != nil {
+			result.Error = err
+			result.MetricsState.Status = metrics.StatusError
+			if utils.IsUserError(err) {
+				result.MetricsLegacyState.IsUserError = true
+				result.MetricsState.Status = metrics.StatusUserError
+			}
+			return result
 		}
-		return result
 	}
 
 	// If service requires IPv6 LoadBalancer -- verify that Subnet with External IPv6 ranges is used.
@@ -303,26 +305,29 @@ func (l4netlb *L4NetLB) provideBackendService(syncResult *L4NetLBSyncResult, hcL
 	servicePorts := l4netlb.Service.Spec.Ports
 	protocol := utils.GetProtocol(servicePorts)
 
-	connectionTrackingPolicy, err := l4netlb.connectionTrackingPolicy()
+	var bs *composite.BackendService
+	var err error
+	var connectionTrackingPolicy *composite.BackendServiceConnectionTrackingPolicy
+
+	connectionTrackingPolicy, err = l4netlb.connectionTrackingPolicy()
 	if err != nil {
 		syncResult.GCEResourceInError = annotations.BackendServiceResource
 		syncResult.Error = err
 	}
-	needsConnectionTracking := connectionTrackingPolicy != nil
-	var bs *composite.BackendService
-	bs, err = l4netlb.backendPool.EnsureL4BackendService(bsName, hcLink, string(protocol), string(l4netlb.Service.Spec.SessionAffinity), string(cloud.SchemeExternal), l4netlb.NamespacedName, *network.DefaultNetwork(l4netlb.cloud), needsConnectionTracking, connectionTrackingPolicy)
+	bs, err = l4netlb.backendPool.EnsureL4BackendService(bsName, hcLink, string(protocol), string(l4netlb.Service.Spec.SessionAffinity), string(cloud.SchemeExternal), l4netlb.NamespacedName, *network.DefaultNetwork(l4netlb.cloud), connectionTrackingPolicy)
 	if err != nil {
 		if utils.IsUnsupportedFeatureError(err, strongSessionAffinityFeatureName) {
 			syncResult.GCEResourceInError = annotations.BackendServiceResource
 			l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeWarning, strongSessionAffinityFeatureName, strongSessionAffinityConditionedSupportMsg)
 			syncResult.Error = utils.NewUserError(err)
 			syncResult.MetricsLegacyState.IsUserError = true
-		} else { // another problem with BackendServiceResource
+		} else { // not UserError but something else
 			syncResult.GCEResourceInError = annotations.BackendServiceResource
 			syncResult.Error = fmt.Errorf("failed to ensure backend service %s - %w", bsName, err)
 		}
 		return ""
 	}
+
 	syncResult.Annotations[annotations.BackendServiceKey] = bsName
 	return bs.SelfLink
 }
@@ -412,8 +417,10 @@ func (l4netlb *L4NetLB) ensureIPv4NodesFirewall(nodeNames []string, ipAddress st
 // It is health check, firewall rules and backend service
 func (l4netlb *L4NetLB) EnsureLoadBalancerDeleted(svc *corev1.Service) *L4NetLBSyncResult {
 	isMultinetService := l4netlb.networkResolver.IsMultinetService(svc)
-	enabledStrongSessionAffinity := annotations.HasStrongSessionAffinityAnnotation(l4netlb.Service)
-	result := NewL4SyncResult(SyncTypeDelete, svc, isMultinetService, enabledStrongSessionAffinity)
+	var result *L4NetLBSyncResult
+	enabledStrongSessionAffinity := l4netlb.enableStrongSessionAffinity && annotations.HasStrongSessionAffinityAnnotation(l4netlb.Service)
+	result = NewL4SyncResult(SyncTypeDelete, svc, isMultinetService, enabledStrongSessionAffinity)
+
 	l4netlb.Service = svc
 
 	l4netlb.deleteIPv4ResourcesOnDelete(result)

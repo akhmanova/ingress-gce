@@ -53,15 +53,16 @@ type L4 struct {
 	scope       meta.KeyType
 	namer       namer.L4ResourcesNamer
 	// recorder is used to generate k8s Events.
-	recorder        record.EventRecorder
-	Service         *corev1.Service
-	ServicePort     utils.ServicePort
-	NamespacedName  types.NamespacedName
-	forwardingRules ForwardingRulesProvider
-	healthChecks    healthchecksl4.L4HealthChecks
-	enableDualStack bool
-	network         network.NetworkInfo
-	networkResolver network.Resolver
+	recorder                           record.EventRecorder
+	Service                            *corev1.Service
+	ServicePort                        utils.ServicePort
+	NamespacedName                     types.NamespacedName
+	forwardingRules                    ForwardingRulesProvider
+	healthChecks                       healthchecksl4.L4HealthChecks
+	enableDualStack                    bool
+	enableStrongSessionAffinityFeature bool // a flag for SSA feature to use SSA code
+	network                            network.NetworkInfo
+	networkResolver                    network.Resolver
 }
 
 // L4ILBSyncResult contains information about the outcome of an L4 ILB sync. It stores the list of resource name annotations,
@@ -96,27 +97,29 @@ func NewL4ILBSyncResult(syncType string, startTime time.Time, svc *corev1.Servic
 }
 
 type L4ILBParams struct {
-	Service          *corev1.Service
-	Cloud            *gce.Cloud
-	Namer            namer.L4ResourcesNamer
-	Recorder         record.EventRecorder
-	DualStackEnabled bool
-	NetworkResolver  network.Resolver
+	Service                      *corev1.Service
+	Cloud                        *gce.Cloud
+	Namer                        namer.L4ResourcesNamer
+	Recorder                     record.EventRecorder
+	DualStackEnabled             bool
+	StrongSessionAffinityEnabled bool // Flag to use SSA feature code, false if SSA code should be ignored
+	NetworkResolver              network.Resolver
 }
 
 // NewL4Handler creates a new L4Handler for the given L4 service.
 func NewL4Handler(params *L4ILBParams) *L4 {
 	var scope meta.KeyType = meta.Regional
 	l4 := &L4{
-		cloud:           params.Cloud,
-		scope:           scope,
-		namer:           params.Namer,
-		recorder:        params.Recorder,
-		Service:         params.Service,
-		healthChecks:    healthchecksl4.NewL4HealthChecks(params.Cloud, params.Recorder),
-		forwardingRules: forwardingrules.New(params.Cloud, meta.VersionGA, scope),
-		enableDualStack: params.DualStackEnabled,
-		networkResolver: params.NetworkResolver,
+		cloud:                              params.Cloud,
+		scope:                              scope,
+		namer:                              params.Namer,
+		recorder:                           params.Recorder,
+		Service:                            params.Service,
+		healthChecks:                       healthchecksl4.NewL4HealthChecks(params.Cloud, params.Recorder),
+		forwardingRules:                    forwardingrules.New(params.Cloud, meta.VersionGA, scope),
+		enableDualStack:                    params.DualStackEnabled,
+		enableStrongSessionAffinityFeature: params.StrongSessionAffinityEnabled,
+		networkResolver:                    params.NetworkResolver,
 	}
 	l4.NamespacedName = types.NamespacedName{Name: params.Service.Name, Namespace: params.Service.Namespace}
 	l4.backendPool = backends.NewPool(l4.cloud, l4.namer)
@@ -444,8 +447,10 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 		}
 	}
 
+	var noConnectionTrackingPolicy *composite.BackendServiceConnectionTrackingPolicy
+	noConnectionTrackingPolicy = nil
 	// ensure backend service
-	bs, err := l4.backendPool.EnsureL4BackendService(bsName, hcLink, string(protocol), string(l4.Service.Spec.SessionAffinity), string(cloud.SchemeInternal), l4.NamespacedName, l4.network, false, nil)
+	bs, err := l4.backendPool.EnsureL4BackendService(bsName, hcLink, string(protocol), string(l4.Service.Spec.SessionAffinity), string(cloud.SchemeInternal), l4.NamespacedName, l4.network, noConnectionTrackingPolicy)
 	if err != nil {
 		result.GCEResourceInError = annotations.BackendServiceResource
 		result.Error = err
