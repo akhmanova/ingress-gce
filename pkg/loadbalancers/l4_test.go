@@ -85,13 +85,13 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 	l4.healthChecks = healthchecksl4.Fake(fakeGCE, l4ilbParams.Recorder)
 
 	bsName := l4.namer.L4Backend(l4.Service.Namespace, l4.Service.Name)
-	_, err := l4.backendPool.EnsureL4BackendService(bsName, "", "TCP", string(svc.Spec.SessionAffinity), string(cloud.SchemeInternal), l4.NamespacedName, *network.DefaultNetwork(fakeGCE), false, &composite.BackendServiceConnectionTrackingPolicy{})
+	_, err := l4.backendPool.EnsureL4BackendService(bsName, "", "TCP", string(svc.Spec.SessionAffinity), string(cloud.SchemeInternal), l4.NamespacedName, *network.DefaultNetwork(fakeGCE), nil)
 	if err != nil {
 		t.Errorf("Failed to ensure backend service  %s - err %v", bsName, err)
 	}
 
 	// Update the Internal Backend Service with a new ServiceAffinity
-	_, err = l4.backendPool.EnsureL4BackendService(bsName, "", "TCP", string(v1.ServiceAffinityNone), string(cloud.SchemeInternal), l4.NamespacedName, *network.DefaultNetwork(fakeGCE), false, &composite.BackendServiceConnectionTrackingPolicy{})
+	_, err = l4.backendPool.EnsureL4BackendService(bsName, "", "TCP", string(v1.ServiceAffinityNone), string(cloud.SchemeInternal), l4.NamespacedName, *network.DefaultNetwork(fakeGCE), nil)
 	if err != nil {
 		t.Errorf("Failed to ensure backend service  %s - err %v", bsName, err)
 	}
@@ -112,7 +112,7 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to update backend service with new connection draining timeout - err %v", err)
 	}
-	bs, err = l4.backendPool.EnsureL4BackendService(bsName, "", "TCP", string(v1.ServiceAffinityNone), string(cloud.SchemeInternal), l4.NamespacedName, *network.DefaultNetwork(fakeGCE), false, &composite.BackendServiceConnectionTrackingPolicy{})
+	bs, err = l4.backendPool.EnsureL4BackendService(bsName, "", "TCP", string(v1.ServiceAffinityNone), string(cloud.SchemeInternal), l4.NamespacedName, *network.DefaultNetwork(fakeGCE), nil)
 	if err != nil {
 		t.Errorf("Failed to ensure backend service  %s - err %v", bsName, err)
 	}
@@ -291,7 +291,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	if hcResult.Err != nil {
 		t.Errorf("Failed to create healthcheck, err %v", hcResult.Err)
 	}
-	_, err := l4.backendPool.EnsureL4BackendService(lbName, hcResult.HCLink, "TCP", string(l4.Service.Spec.SessionAffinity), string(cloud.SchemeInternal), l4.NamespacedName, *defaultNetwork, false, &composite.BackendServiceConnectionTrackingPolicy{})
+	_, err := l4.backendPool.EnsureL4BackendService(lbName, hcResult.HCLink, "TCP", string(l4.Service.Spec.SessionAffinity), string(cloud.SchemeInternal), l4.NamespacedName, *defaultNetwork, nil)
 	if err != nil {
 		t.Errorf("Failed to create backendservice, err %v", err)
 	}
@@ -2161,12 +2161,13 @@ func mustSetupILBTestHandler(t *testing.T, svc *v1.Service, nodeNames []string) 
 	fakeGCE := getFakeGCECloud(vals)
 
 	l4ilbParams := &L4ILBParams{
-		Service:          svc,
-		Cloud:            fakeGCE,
-		Namer:            namer,
-		Recorder:         record.NewFakeRecorder(100),
-		DualStackEnabled: true,
-		NetworkResolver:  network.NewFakeResolver(network.DefaultNetwork(fakeGCE)),
+		Service:                      svc,
+		Cloud:                        fakeGCE,
+		Namer:                        namer,
+		Recorder:                     record.NewFakeRecorder(100),
+		DualStackEnabled:             true,
+		StrongSessionAffinityEnabled: false,
+		NetworkResolver:              network.NewFakeResolver(network.DefaultNetwork(fakeGCE)),
 	}
 	l4 := NewL4Handler(l4ilbParams)
 	l4.healthChecks = healthchecksl4.Fake(fakeGCE, l4ilbParams.Recorder)
