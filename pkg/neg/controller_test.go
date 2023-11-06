@@ -1057,6 +1057,7 @@ func TestMergeDefaultBackendServicePortInfoMap(t *testing.T) {
 		},
 		{
 			desc: "L7 Regional XLB is disabled, ing41 is L7 Regional XLB, does not has backend and default backend service does not have NEG annotation",
+
 			getIngress: func() *networkingv1.Ingress {
 				ing := newTestIngress("ing41")
 				ing.Annotations = map[string]string{annotations.IngressClassKey: annotations.GceL7XLBRegionalIngressClass}
